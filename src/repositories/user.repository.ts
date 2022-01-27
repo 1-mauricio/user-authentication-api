@@ -1,3 +1,4 @@
+import DatabaseError from "../models/errors/database.error.model";
 import db from "../db";
 import User from "../models/user.model";
 
@@ -14,18 +15,40 @@ class UserRepository {
   }
 
   async findById(uuid: string): Promise<User> {
-    const query = `
+    try {
+      const query = `
             SELECT uuid,username
             FROM application_user
             WHERE uuid = $1
-        `;
-    //$i - evita sql injection
-    const values = [uuid];
-    const { rows } = await db.query<User>(query, values);
-    //destructure object
-    const [user] = rows;
-    //destructure array
-    return user;
+            `;
+      //$i - evita sql injection
+      const values = [uuid];
+      const { rows } = await db.query<User>(query, values);
+      //destructure object
+      const [user] = rows;
+      //destructure array
+      return user;
+    } catch (error) {
+      throw new DatabaseError('Erro na consulta por ID', error);
+    }
+  }
+
+  async findByUsernameAndPassword(username:string, password:string): Promise<User | null> {
+    try {
+
+      const query = `
+      SELECT uuid, username
+      FROM application_user
+      WHERE username = $1
+      AND password = crypt($2, 'my_salt')
+      `;
+      const values = [username, password];
+      const { rows } = await db.query<User>(query, values);
+      const [user] = rows;
+      return user || null;
+    } catch (error) {
+      throw new DatabaseError('Erro na consulta por username e password', error)
+    }
   }
 
   async create(user: User): Promise<string> {
@@ -60,13 +83,13 @@ class UserRepository {
   }
 
   async remove(uuid: string): Promise<void> {
-      const script = `
+    const script = `
       DELETE FROM application_user
       WHERE uuid = $1
       `;
-      const values = [uuid];
+    const values = [uuid];
 
-      await db.query(script, values)
+    await db.query(script, values);
   }
 }
 
